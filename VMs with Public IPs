@@ -1,9 +1,71 @@
+resource "azurerm_resource_group" "Main-HUB" {
+  name     = "Main-HUB"
+  location = "UK South"
+}
+resource "azurerm_virtual_network" "HUB_vnet" {
+  name                = "HUB-vnet"
+  resource_group_name = azurerm_resource_group.Main-HUB.name
+  location            = azurerm_resource_group.Main-HUB.location
+  address_space       = ["10.0.0.0/16"]
+}
+
+resource "azurerm_virtual_network" "Spoke_vnet" {
+  name                = "Spoke-vnet"
+  resource_group_name = azurerm_resource_group.Spoke.name
+  location            = azurerm_resource_group.Spoke.location
+  address_space       = ["10.1.0.0/16"]
+}
+
+resource "azurerm_subnet" "HUB_subnet" {
+  name                 = "HUB-subnet"
+  resource_group_name  = azurerm_resource_group.Main-HUB.name
+  virtual_network_name = azurerm_virtual_network.HUB_vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
+resource "azurerm_subnet" "Spoke1_subnet" {
+  name                 = "Spoke1-subnet"
+  resource_group_name  = azurerm_resource_group.Spoke.name
+  virtual_network_name = azurerm_virtual_network.Spoke_vnet.name
+  address_prefixes     = ["10.1.1.0/24"]
+}
+
+resource "azurerm_network_interface" "vm1_nic" {
+  name                = "vm1-nic"
+  resource_group_name = azurerm_resource_group.Main-HUB.name
+  location            = azurerm_resource_group.Main-HUB.location
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.HUB_subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_network_interface" "vm2_nic" {
+  name                = "vm2-nic"
+  resource_group_name = azurerm_resource_group.Spoke.name
+  location            = azurerm_resource_group.Spoke.location
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.Spoke1_subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
 resource "azurerm_linux_virtual_machine" "vm1" {
   name                = "vm1"
-  resource_group_name = azurerm_resource_group.HUB.name
-  location            = azurerm_resource_group.HUB.location
-  size                = "Standard_B1ls"  # Free-tier VM size
+  resource_group_name = azurerm_resource_group.Main-HUB.name
+  location            = azurerm_resource_group.Main-HUB.location
+  size                = "Standard_B1ls"
   admin_username      = "azureuser"
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = "azureuser"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDFdExS9/Ig+Kaf7zAkxd4AGn56oEh0T3MxB5oqHzHo8aU1aR9Dpmh5gTrEKNmXe798jUnp2bCKiSOF1D8tTRxyaey3NaHlwRi4JWACjNYhcLoi59SAjpHpxmLg2CaeLmr51ykbtS14QiiybVyuyQ3zNsTZOuqAL3utFYHaSxB/ZWcOUgnhDhkpmmcX5usFikU4TkN2upMGWnXtHkqiUlpgIbNOnk/zkoXk6uxVEnZofo1BT+Xsp/O6Q6ptRmJ9xkep/TY9iud4J0+G53nXpYEKOfxEM39dd7gnOptRs6DXKUeux/pVe7Wu1SYv6aeDpE9UYN6LdG26DfpyBXTFBfVx"
+  }
 
   network_interface_ids = [azurerm_network_interface.vm1_nic.id]
 
@@ -20,32 +82,18 @@ resource "azurerm_linux_virtual_machine" "vm1" {
   }
 }
 
-resource "azurerm_public_ip" "vm1_ip" {
-  name                = "vm1-public-ip"
-  resource_group_name = azurerm_resource_group.HUB.name
-  location            = azurerm_resource_group.HUB.location
-  allocation_method   = "Dynamic"
-}
-
-resource "azurerm_network_interface" "vm1_nic" {
-  name                = "vm1-nic"
-  resource_group_name = azurerm_resource_group.HUB.name
-  location            = azurerm_resource_group.HUB.location
-
-  ip_configuration {
-    name                          = "vm1-ip-config"
-    subnet_id                     = azurerm_subnet.HUB.id  # Fixed subnet reference
-    public_ip_address_id          = azurerm_public_ip.vm1_ip.id
-    private_ip_address_allocation = "Dynamic"
-  }
-}
-
 resource "azurerm_linux_virtual_machine" "vm2" {
-  name                = "vm2"  # Fixed VM name
+  name                = "vm2"
   resource_group_name = azurerm_resource_group.Spoke.name
   location            = azurerm_resource_group.Spoke.location
-  size                = "Standard_B1ls"  # Free-tier VM size
+  size                = "Standard_B1ls"
   admin_username      = "azureuser"
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = "azureuser"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDFdExS9/Ig+Kaf7zAkxd4AGn56oEh0T3MxB5oqHzHo8aU1aR9Dpmh5gTrEKNmXe798jUnp2bCKiSOF1D8tTRxyaey3NaHlwRi4JWACjNYhcLoi59SAjpHpxmLg2CaeLmr51ykbtS14QiiybVyuyQ3zNsTZOuqAL3utFYHaSxB/ZWcOUgnhDhkpmmcX5usFikU4TkN2upMGWnXtHkqiUlpgIbNOnk/zkoXk6uxVEnZofo1BT+Xsp/O6Q6ptRmJ9xkep/TY9iud4J0+G53nXpYEKOfxEM39dd7gnOptRs6DXKUeux/pVe7Wu1SYv6aeDpE9UYN6LdG26DfpyBXTFBfVx"
+  }
 
   network_interface_ids = [azurerm_network_interface.vm2_nic.id]
 
@@ -59,25 +107,5 @@ resource "azurerm_linux_virtual_machine" "vm2" {
     offer     = "UbuntuServer"
     sku       = "18.04-LTS"
     version   = "latest"
-  }
-}
-
-resource "azurerm_public_ip" "vm2_ip" {
-  name                = "vm2-public-ip"
-  resource_group_name = azurerm_resource_group.Spoke.name
-  location            = azurerm_resource_group.Spoke.location
-  allocation_method   = "Dynamic"
-}
-
-resource "azurerm_network_interface" "vm2_nic" {
-  name                = "vm2-nic"
-  resource_group_name = azurerm_resource_group.Spoke.name
-  location            = azurerm_resource_group.Spoke.location
-
-  ip_configuration {
-    name                          = "vm2-ip-config"
-    subnet_id                     = azurerm_subnet.Spoke.id  # Correct subnet reference
-    public_ip_address_id          = azurerm_public_ip.vm2_ip.id  # Corrected public IP reference
-    private_ip_address_allocation = "Dynamic"
   }
 }
