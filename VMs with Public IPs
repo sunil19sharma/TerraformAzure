@@ -1,32 +1,33 @@
-resource "azurerm_resource_group" "Main-HUB" {
-  name     = "Main-HUB"
-  location = "UK South"
-}
-resource "azurerm_virtual_network" "HUB_vnet" {
-  name                = "HUB-vnet"
+resource "azurerm_virtual_network" "main-vnet" {
+  name                = "main-vnet"
   resource_group_name = azurerm_resource_group.Main-HUB.name
   location            = azurerm_resource_group.Main-HUB.location
   address_space       = ["10.0.0.0/16"]
 }
 
-resource "azurerm_virtual_network" "Spoke_vnet" {
+resource "azurerm_resource_group" "Main-HUB" {
+  name     = "Main-HUB"
+  location = "UK South"
+}
+
+resource "azurerm_virtual_network" "Spoke-vnet" {
   name                = "Spoke-vnet"
   resource_group_name = azurerm_resource_group.Spoke.name
   location            = azurerm_resource_group.Spoke.location
   address_space       = ["10.1.0.0/16"]
 }
 
-resource "azurerm_subnet" "HUB_subnet" {
+resource "azurerm_subnet" "HUB-subnet" {
   name                 = "HUB-subnet"
   resource_group_name  = azurerm_resource_group.Main-HUB.name
-  virtual_network_name = azurerm_virtual_network.HUB_vnet.name
+  virtual_network_name = azurerm_virtual_network.main-vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-resource "azurerm_subnet" "Spoke1_subnet" {
-  name                 = "Spoke1-subnet"
+resource "azurerm_subnet" "Spoke-subnet" {
+  name                 = "Spoke-subnet"
   resource_group_name  = azurerm_resource_group.Spoke.name
-  virtual_network_name = azurerm_virtual_network.Spoke_vnet.name
+  virtual_network_name = azurerm_virtual_network.Spoke-vnet.name
   address_prefixes     = ["10.1.1.0/24"]
 }
 
@@ -37,7 +38,7 @@ resource "azurerm_network_interface" "vm1_nic" {
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.HUB_subnet.id
+    subnet_id                     = azurerm_subnet.HUB-subnet.id
     private_ip_address_allocation = "Dynamic"
   }
 }
@@ -49,17 +50,17 @@ resource "azurerm_network_interface" "vm2_nic" {
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.Spoke1_subnet.id
+    subnet_id                     = azurerm_subnet.Spoke-subnet.id
     private_ip_address_allocation = "Dynamic"
   }
 }
 
 resource "azurerm_linux_virtual_machine" "vm1" {
-  name                = "vm1"
-  resource_group_name = azurerm_resource_group.Main-HUB.name
-  location            = azurerm_resource_group.Main-HUB.location
-  size                = "Standard_B1ls"
-  admin_username      = "azureuser"
+  name                            = "vm1"
+  resource_group_name             = azurerm_resource_group.Main-HUB.name
+  location                        = azurerm_resource_group.Main-HUB.location
+  size                            = "Standard_B1ls"
+  admin_username                  = "azureuser"
   disable_password_authentication = true
 
   admin_ssh_key {
@@ -83,16 +84,17 @@ resource "azurerm_linux_virtual_machine" "vm1" {
 }
 
 resource "azurerm_linux_virtual_machine" "vm2" {
-  name                = "vm2"
-  resource_group_name = azurerm_resource_group.Spoke.name
-  location            = azurerm_resource_group.Spoke.location
-  size                = "Standard_B1ls"
-  admin_username      = "azureuser"
+  name                            = "vm2"
+  resource_group_name             = azurerm_resource_group.Spoke.name
+  location                        = azurerm_resource_group.Spoke.location
+  size                            = "Standard_B1ls"
+  admin_username                  = "azureuser"
   disable_password_authentication = true
 
   admin_ssh_key {
     username   = "azureuser"
     public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDFdExS9/Ig+Kaf7zAkxd4AGn56oEh0T3MxB5oqHzHo8aU1aR9Dpmh5gTrEKNmXe798jUnp2bCKiSOF1D8tTRxyaey3NaHlwRi4JWACjNYhcLoi59SAjpHpxmLg2CaeLmr51ykbtS14QiiybVyuyQ3zNsTZOuqAL3utFYHaSxB/ZWcOUgnhDhkpmmcX5usFikU4TkN2upMGWnXtHkqiUlpgIbNOnk/zkoXk6uxVEnZofo1BT+Xsp/O6Q6ptRmJ9xkep/TY9iud4J0+G53nXpYEKOfxEM39dd7gnOptRs6DXKUeux/pVe7Wu1SYv6aeDpE9UYN6LdG26DfpyBXTFBfVx"
+
   }
 
   network_interface_ids = [azurerm_network_interface.vm2_nic.id]
